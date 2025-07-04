@@ -1,15 +1,14 @@
 import os
 import secrets
-import sys
 import time
 import socket
 import struct
-from functools import wraps
 import threading
 import signal
-from typing import override
+from functools import wraps
 from flask import Flask, request, Response, session
 from flask_basicauth import BasicAuth
+
 import initialize
 from python.helpers import errors, files, git, mcp_server
 from python.helpers.files import get_abs_path
@@ -18,13 +17,10 @@ from python.helpers.extract_tools import load_classes_from_folder
 from python.helpers.api import ApiHandler
 from python.helpers.print_style import PrintStyle
 
-
-# Set the new timezone to 'UTC'
+# Set timezone to UTC
 os.environ["TZ"] = "UTC"
-# Apply the timezone change
 time.tzset()
 
-# initialize the internal Flask server
 webapp = Flask("app", static_folder=get_abs_path("./webui"), static_url_path="/")
 webapp.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 webapp.config.update(
@@ -32,45 +28,34 @@ webapp.config.update(
     SESSION_COOKIE_SAMESITE="Strict",
 )
 
-
 lock = threading.Lock()
-
-# Set up basic authentication for UI and API but not MCP
 basic_auth = BasicAuth(webapp)
 
 
 def is_loopback_address(address):
     loopback_checker = {
-        socket.AF_INET: lambda x: struct.unpack("!I", socket.inet_aton(x))[0]
-        >> (32 - 8)
-        == 127,
+        socket.AF_INET: lambda x: struct.unpack("!I", socket.inet_aton(x))[0] >> (32 - 8) == 127,
         socket.AF_INET6: lambda x: x == "::1",
     }
-    address_type = "hostname"
     try:
-        socket.inet_pton(socket.AF_INET6, address)
-        address_type = "ipv6"
+        socket.inet_pton(socket.AF_INET, address)
+        return loopback_checker[socket.AF_INET](address)
     except socket.error:
         try:
-            socket.inet_pton(socket.AF_INET, address)
-            address_type = "ipv4"
+            socket.inet_pton(socket.AF_INET6, address)
+            return loopback_checker[socket.AF_INET6](address)
         except socket.error:
-            address_type = "hostname"
+            pass
 
-    if address_type == "ipv4":
-        return loopback_checker[socket.AF_INET](address)
-    elif address_type == "ipv6":
-        return loopback_checker[socket.AF_INET6](address)
-    else:
-        for family in (socket.AF_INET, socket.AF_INET6):
-            try:
-                r = socket.getaddrinfo(address, None, family, socket.SOCK_STREAM)
-            except socket.gaierror:
+    for family in (socket.AF_INET, socket.AF_INET6):
+        try:
+            r = socket.getaddrinfo(address, None, family, socket.SOCK_STREAM)
+        except socket.gaierror:
+            return False
+        for family, _, _, _, sockaddr in r:
+            if not loopback_checker[family](sockaddr[0]):
                 return False
-            for family, _, _, _, sockaddr in r:
-                if not loopback_checker[family](sockaddr[0]):
-                    return False
-        return True
+    return True
 
 
 def requires_api_key(f):
@@ -87,26 +72,18 @@ def requires_api_key(f):
         else:
             return Response("API key required", 401)
         return await f(*args, **kwargs)
-
     return decorated
 
 
-# allow only loopback addresses
 def requires_loopback(f):
     @wraps(f)
     async def decorated(*args, **kwargs):
         if not is_loopback_address(request.remote_addr):
-            return Response(
-                "Access denied.",
-                403,
-                {},
-            )
+            return Response("Access denied.", 403)
         return await f(*args, **kwargs)
-
     return decorated
 
 
-# require authentication for handlers
 def requires_auth(f):
     @wraps(f)
     async def decorated(*args, **kwargs):
@@ -116,13 +93,12 @@ def requires_auth(f):
             auth = request.authorization
             if not auth or not (auth.username == user and auth.password == password):
                 return Response(
-                    "Could not verify your access level for that URL.\n"
+                    "Could not verify your access level.\n"
                     "You have to login with proper credentials",
                     401,
                     {"WWW-Authenticate": 'Basic realm="Login Required"'},
                 )
         return await f(*args, **kwargs)
-
     return decorated
 
 
@@ -134,22 +110,16 @@ def csrf_protect(f):
         if not token or not header or token != header:
             return Response("CSRF token missing or invalid", 403)
         return await f(*args, **kwargs)
-
     return decorated
 
 
-# handle default address, load index
 @webapp.route("/", methods=["GET"])
 @requires_auth
 async def serve_index():
-    gitinfo = None
     try:
         gitinfo = git.get_git_info()
     except Exception:
-        gitinfo = {
-            "version": "unknown",
-            "commit_time": "unknown",
-        }
+        gitinfo = {"version": "unknown", "commit_time": "unknown"}
     return files.read_file(
         "./webui/index.html",
         version_no=gitinfo["version"],
@@ -160,24 +130,16 @@ async def serve_index():
 def run():
     PrintStyle().print("Initializing framework...")
 
-    # Suppress only request logs but keep the startup messages
-    from werkzeug.serving import WSGIRequestHandler
-    from werkzeug.serving import make_server
+    from werkzeug.serving import WSGIRequestHandler, make_server
     from werkzeug.middleware.dispatcher import DispatcherMiddleware
-    from a2wsgi import ASGIMiddleware, WSGIMiddleware
-
-    PrintStyle().print("Starting server...")
+    from a2wsgi import ASGIMiddleware
 
     class NoRequestLoggingWSGIRequestHandler(WSGIRequestHandler):
         def log_request(self, code="-", size="-"):
-            pass  # Override to suppress request logging
+            pass
 
-    # Get configuration from environment
-    port = runtime.get_web_ui_port()
-    host = (
-        runtime.get_arg("host") or dotenv.get_dotenv_value("WEB_UI_HOST") or "localhost"
-    )
-    server = None
+    port = int(os.getenv("WEB_UI_PORT", "5000"))
+    host = runtime.get_arg("host") or dotenv.get_dotenv_value("WEB_UI_HOST") or "localhost"
 
     def register_api_handler(app, handler: type[ApiHandler]):
         name = handler.__module__.split(".")[-1]
@@ -196,18 +158,13 @@ def run():
             handler_wrap = csrf_protect(handler_wrap)
 
         app.add_url_rule(
-            f"/{name}",
-            f"/{name}",
-            handler_wrap,
-            methods=handler.get_methods(),
+            f"/{name}", f"/{name}", handler_wrap, methods=handler.get_methods()
         )
 
-    # initialize and register API handlers
     handlers = load_classes_from_folder("python/api", "*.py", ApiHandler)
     for handler in handlers:
         register_api_handler(webapp, handler)
 
-    # add the webapp and mcp to the app
     app = DispatcherMiddleware(
         webapp,
         {
@@ -215,7 +172,6 @@ def run():
         },
     )
     PrintStyle().debug("Registered middleware for MCP and MCP token")
-
     PrintStyle().debug(f"Starting server at {host}:{port}...")
 
     server = make_server(
@@ -225,29 +181,34 @@ def run():
         request_handler=NoRequestLoggingWSGIRequestHandler,
         threaded=True,
     )
+
     process.set_server(server)
     server.log_startup()
 
-    # Start init_a0 in a background thread when server starts
-    # threading.Thread(target=init_a0, daemon=True).start()
-    init_a0()
+    # Start initialization in background
+    threading.Thread(target=init_a0, daemon=True).start()
 
-    # run the server
     server.serve_forever()
 
 
 def init_a0():
-    # initialize contexts and MCP
-    init_chats = initialize.initialize_chats()
-    initialize.initialize_mcp()
-    # start job loop
-    initialize.initialize_job_loop()
+    try:
+        init_chats = initialize.initialize_chats()
+        initialize.initialize_mcp()
 
-    # only wait for init chats, otherwise they would seem to dissapear for a while on restart
-    init_chats.result_sync()
+        # Start job loop only if RFC is configured
+        rfc_password = dotenv.get_dotenv_value("RFC_PASSWORD")
+        if rfc_password:
+            initialize.initialize_job_loop()
+        else:
+           print(f"[🔐] RFC_PASSWORD = {dotenv.get_dotenv_value('RFC_PASSWORD')}")
+        
+        init_chats.result_sync()
+
+    except Exception as e:
+        PrintStyle().error(f"[❌] Error initializing A0: {e}")
 
 
-# run the internal server
 if __name__ == "__main__":
     runtime.initialize()
     dotenv.load_dotenv()

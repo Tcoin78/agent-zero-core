@@ -1,0 +1,6 @@
+id: code_execution_tool
+name: Local Code Execution
+enabled: true
+tool_module: az_local_exec_tool
+entrypoint: CodeExecutionTool
+runtimes: ["python", "bash"]

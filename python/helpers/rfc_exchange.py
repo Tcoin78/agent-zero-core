@@ -1,19 +1,30 @@
-from python.helpers import runtime, crypto, dotenv
+import os
+from python.helpers.dotenv import get_dotenv_value
+
+# Clave usada en .env
+KEY_ROOT_PASSWORD = "RFC_ROOT_PASSWORD"
 
 async def get_root_password():
-    if runtime.is_dockerized():
-        pswd = _get_root_password()
-    else:
-        priv = crypto._generate_private_key()
-        pub = crypto._generate_public_key(priv)
-        enc = await runtime.call_development_function(_provide_root_password, pub)
-        pswd = crypto.decrypt_data(enc, priv)
-    return pswd
-    
-def _provide_root_password(public_key_pem: str):
-    pswd = _get_root_password()
-    enc = crypto.encrypt_data(pswd, public_key_pem)
-    return enc
+    """
+    Devuelve la contraseña root directamente desde la variable de entorno RFC_ROOT_PASSWORD
+    o desde el archivo .env si no está presente como variable.
+    """
+    return _get_root_password()
+
 
 def _get_root_password():
-    return dotenv.get_dotenv_value(dotenv.KEY_ROOT_PASSWORD) or ""
+    """
+    Lógica literal y segura para obtener la clave root.
+    """
+    # 1. Intenta obtener desde variables de entorno
+    env_pwd = os.getenv(KEY_ROOT_PASSWORD)
+    if env_pwd:
+        return env_pwd
+
+    # 2. Si no existe en entorno, intenta desde archivo .env
+    dotenv_pwd = get_dotenv_value(KEY_ROOT_PASSWORD)
+    if dotenv_pwd:
+        return dotenv_pwd
+
+    # 3. Por defecto, cadena vacía si no se encuentra
+    return ""

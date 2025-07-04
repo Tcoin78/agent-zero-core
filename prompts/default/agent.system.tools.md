@@ -19,3 +19,4 @@
 {{ include './agent.system.tool.scheduler.md' }}
 
 {{ include './agent.system.tool.document_query.md' }}
+- TOOL_SHELL ⇒ prompts/default/agent.system.tool.shell.md

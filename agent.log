@@ -1,0 +1,8 @@
+Initializing framework...[0m
+Starting server...[0m
+
+[38;2;128;128;128mDebug: Registered middleware for MCP and MCP token[0m
+
+[38;2;128;128;128mDebug: Starting server at localhost:5000...[0m
+
+[38;2;128;128;128mDebug: Changing timezone from None to America/New_York[0m
