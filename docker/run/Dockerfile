@@ -3,11 +3,8 @@ FROM frdel/agent-zero-base:latest
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# build-time branch
-ARG BRANCH
-RUN if [ -z "$BRANCH" ]; then \
-      echo "ERROR: BRANCH is not set!" >&2; exit 1; \
-    fi
+# build-time branch (defaults to main if not passed)
+ARG BRANCH=main
 ENV BRANCH=${BRANCH}
 
 # Install OS-level deps (with full upgrade to avoid python3-venv conflict)
