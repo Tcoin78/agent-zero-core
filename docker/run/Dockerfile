@@ -24,7 +24,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # copy our installer + stub playwright script
 COPY fs/ins/ /ins/
-RUN chmod +x /ins/*.sh
+RUN chmod +x /ins/install_A0.sh
+#RUN chmod +x /ins/*.sh
 
 # run just that one installer
 RUN /ins/install_A0.sh ${BRANCH}
