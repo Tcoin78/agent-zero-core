@@ -9,8 +9,8 @@ echo "🔧 Cloning agent-zero ➜ branch ${BRANCH}"
 rm -rf "${REPO_DIR}"
 git clone --branch "${BRANCH}" "${GIT_REPO}" "${REPO_DIR}"
 
-echo "💥 Removing old venv entirely"
-rm -rf /opt/venv
+echo "💥 Removing old venv entirely (ignore errors)"
+rm -rf /opt/venv || true
 
 echo "🐍 Clearing any existing venv"
 python3 -m venv --clear /opt/venv
