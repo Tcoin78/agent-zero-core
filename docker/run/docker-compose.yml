@@ -1,8 +1,20 @@
+
+
 services:
-  agent-zero:
-    container_name: agent-zero
-    image: frdel/agent-zero:latest
+  goliath:
+    image: run-agent-zero
+    container_name: goliath
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BRANCH: main
     volumes:
-      - ./agent-zero:/a0
+      - ../..:/app
+      - ../../data/training:/data/training
     ports:
-      - "50080:80"
+      - "3022:22"
+      - "8080:80"
+      - "9000-9009:9000-9009"
+    tty: true
+    stdin_open: true

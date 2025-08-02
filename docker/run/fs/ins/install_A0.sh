@@ -1,34 +1,32 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Exit immediately if a command exits with a non-zero status.
-# set -e
+BRANCH=${1:-main}
+REPO_DIR="/git/agent-zero"
+GIT_REPO="https://github.com/Tcoin78/agent-zero-core.git"
 
-# branch from parameter
-if [ -z "$1" ]; then
-    echo "Error: Branch parameter is empty. Please provide a valid branch name."
-    exit 1
-fi
-BRANCH="$1"
+echo "🔧 Cloning agent-zero ➜ branch ${BRANCH}"
+rm -rf "${REPO_DIR}"
+git clone --branch "${BRANCH}" "${GIT_REPO}" "${REPO_DIR}"
 
-git clone -b "$BRANCH" "https://github.com/frdel/agent-zero" "/git/agent-zero" || {
-    echo "CRITICAL ERROR: Failed to clone repository. Branch: $BRANCH"
-    exit 1
-}
+echo "🐍 (Re)creating venv by nuking old and making fresh"
+rm -rf /opt/venv
+python3 -m venv /opt/venv
+source /opt/venv/bin/activate
 
-. "/ins/setup_venv.sh" "$@"
+VENV_PYTHON="/opt/venv/bin/python"
+VENV_PIP="/opt/venv/bin/pip"
 
-# moved to base image
-# # Ensure the virtual environment and pip setup
-# pip install --upgrade pip ipython requests
-# # Install some packages in specific variants
-# pip install torch --index-url https://download.pytorch.org/whl/cpu
+echo "📦 Forcing fresh pip/setuptools/wheel install"
+$VENV_PIP install --upgrade --force-reinstall pip setuptools wheel
 
-# Install remaining A0 python packages
-uv pip install -r /git/agent-zero/requirements.txt
+echo "📥 Installing requirements"
+$VENV_PIP install --no-cache-dir -r "${REPO_DIR}/requirements.txt"
 
-# install playwright
-bash /ins/install_playwright.sh "$@"
+echo "▶️ Running Playwright installer (stub)"
+bash /ins/install_playwright.sh "${BRANCH}"
 
-# Preload A0
-python /git/agent-zero/preload.py --dockerized=true
+echo "⚙️ Preloading models"
+$VENV_PYTHON "${REPO_DIR}/preload.py" --dockerized=true
+
+echo "✅ install_A0.sh completed successfully!"
