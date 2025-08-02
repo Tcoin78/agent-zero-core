@@ -12,8 +12,8 @@ git clone --branch "${BRANCH}" "${GIT_REPO}" "${REPO_DIR}"
 echo "💥 Removing old venv entirely"
 rm -rf /opt/venv
 
-echo "🐍 Creating fresh venv"
-python3 -m venv /opt/venv
+echo "🐍 Clearing any existing venv"
+python3 -m venv --clear /opt/venv
 source /opt/venv/bin/activate
 
 VENV_PYTHON="/opt/venv/bin/python"
